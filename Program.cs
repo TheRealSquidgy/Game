@@ -1,4 +1,6 @@
-﻿using System;
+//This is the shop function. It needs to be integrated into the main game code!
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;

@@ -1,0 +1,178 @@
+Current game logic
+
+Main
+//Logic abstraction happens here. Initiates player object for use, runs start, then sets up a boolean and an entity object. Inside the gameplay loop, we create an enemy, run precombat and participate in combat until someone dies. The name of the victor is then passed to post-combat, and if the winner is the player then they level up, get money, etc. After post-combat you are prompted if you want to play again. Depending on your answer, the gameplay loop starts again or the game exits.
+- creates soldier object player
+- checks if save file exists
+	- if save file exists, load save file
+- run Start(player)
+- create boolean playTheGame
+- create entity object victor
+- while playTheGame = true
+	- create sectoid object enemy
+	- run PreCombat(player, enemy)
+	- victor = Combat(player, enemy)
+	- PostCombat(victor, player)
+	- playTheGame = PlayAgain()
+- System.Environment.Exit(1)
+
+Start // This function is mostly okay. No changes needed
+- "Welcome!"
+- "Press 1 to start new soldier career"
+- "Press 2 to resume existing career"
+- If save file exists, display save data info
+	- Name
+	- Level
+	- Career winnings
+	- Missions survived
+- If save file doesn't exist, "NO SAVE DATA"
+
+//all these should be switch statements
+if player input = 1...
+	- ...and save file exists, inform them that creating a new soldier career will overwrite their existing sava data. Confirm? Y/N
+		- if Y run CreateSoldier(player) function
+		- if N "Creation cancelled.", prompts choices again and awaits input. // This should be changed so the user acknowledges the message before the screen clears and the start menu displays again
+	- ...and save file does not exist, run CreateSoldier(player) function
+else if player input = 2
+	- if save file exists, load player state // This should be removed. The player state is already loaded from the save file at the start menu display. Test and verify. The only thing here should be the else, or perhaps this is where we return the name of the PreCombat function to the orchestrator.
+	- else if save file doesn't exist "No save data! Please select 1." Player input cleared, awaits input // screen clear, start menu display again
+	- else invalid input. Please enter 1 or 2
+
+CreateSoldier
+\\Passes in the player object and prompts user for name. Player must confirm the name before the function exits, function will keep looping until a name is selected. This function shouldn't need touching.
+
+SaveToFile
+\\saves player to binary file. Look into XML file serialization.
+
+LoadFromFile
+\\Opens save file, writes contents to soldier object, function returns loaded soldier object. Allows us to treat LoadFromFile(player) as var contents
+
+PreCombat
+\\Could apply string formatting for neatness
+"You are" name, class, hp, weapon that does x-y damage
+"Your opponent is " the same
+"Let battle commence!"
+
+Combat
+-While someone is still alive
+	- prompt to attack
+		- attack the enemy
+		- if enemy is dead, return player object
+		- attack player
+		- if player is dead, return enemy object
+	else
+		- invalid input
+		
+	return player object (should never trigger)
+	
+Attack
+//This logic can be simplified
+- roll 100 sided dice for hit
+- if roll value < attacker aim
+	- hit! roll 100 sided dice for crit
+	- if roll value < attacker's weapon crit chance
+		- crit! roll for crit damage
+		- apply crit damage to enemy
+		- if enemy is not dead
+			- "Crit the enemy. Ow!"
+		- else
+			- "Crit to death! Splat!"
+	- else just regular damage. roll for damage
+		- apply regular damage to enemy
+			- if enemy not dead
+				- "You fire for x-y dmg"
+				- list your heath, opponents health
+			- else enemy is dead
+				- "You fire for x-y dmg, killing them!"
+- else miss
+	- "Missed!"
+	- list your health, opponents health
+
+PostCombat
+//Handles battle results. If player wins, they get exp, moonbux, restored to full health, displays progress to next level and their game gets saved. If player dies, "You are dead! Game over.", save is deleted, game exits.
+- Worth noting is how exp and levelling is handled.
+
+GeneratePrizeMoney
+//Randomly generates value 100-200, returns value
+
+GenerateExp
+//Randomly generates value 80-120, returns value
+
+CalculateNewExpLevelReq
+//Calculates the next level's exp requirement, returns value
+
+PlayAgain
+//Can be optimised with switches
+- "Would you like to try again?"
+	- if Y return true
+	- else if N return false
+	- else "Invalid input. Answer with Y/N"
+  
+New game logic
+
+Main
+//New game logic: Each 'main' function will return the name of the next function to run
+Var nextFunction = 'Start';
+while nextFunction != 'exit'
+	switch(nextFunction)
+		case 'Start': 
+			Start();
+		case 'Mission' : 
+			PreCombat();
+			Combat();
+			PostCombat();
+		case 'Shop' : 
+			GoShopping();
+		default:
+			"This should never run. Something has gone wrong."
+			Console.ReadLine();
+			Exit();
+Exit();
+
+Start
+//Mostly good, shouldn't need changing. As long as the player's save is loaded and/or the player object is instantiated before the function ends (which it does), it will work. 
+- Change relational expression from if else to switch statement
+- return "PreCombat" at end of function. 
+- Move the save file load from main() into start function
+
+PreCombat, Combat and PostCombat
+//Probably deserve to be packaged in their own static class (Mission?).
+- PreCombat returns Combat, Combat returns PostCombat
+- PostCombat should be rewritten to prompt the user what to do next. They can return Exit, GoShopping or PreCombat depending on the case statement chosen (PostCombat returns OptionSelect?)
+- Simplify the attack function by abstracting roll to hit and roll to crit into their own separate functions.
+- What step is sectoid object created? Can I instantiate sectoid in PreCombat and still use it in Combat?
+
+SaveToFile, LoadFromFile
+- package into static class 
+	- File? Check if 'File' is a reserved keyword
+	- What about SaveState? SaveState.Load, SaveState.Save.
+
+
+GoShopping
+//Should be turned into a static class and its 'parts' broken up into their own functions.
+- Package into static class named Shop. 
+- Verify that my definition between weapons and items is clear enough for future expansion.
+	- A ShopItem is an item with a price
+		- A ShopItem coud be anything with a price. It might not always be a weapon. It could be armour, or a consumable, or another item. It will always only ever have one classification (e.g. weapon is not a consumable). Is this a good time to use overloading? Research class overloading
+	- The ShopInventory is a list of ShopItems!
+	- Currently the ShopInventory's ShopItems are all Weapons, but this will change in the future
+- Creating the ShopInventory and stocking it with ShopItems should only happen once. (StockShelves?)
+- The user is then prompted to select an from the ShopInventory, or to LEAVE the store. (BrowseSelection)
+	- If user selects leave then they are taken to the OptionSelect function
+	- if user enters an integer with a valid number that equals an index value in ShopInventory then that item is selected
+- Item data is displayed along with price and player currency
+	- check for ownership
+		if false, check if player can afford
+			if false, display insufficient funds message, prompt to return to shop
+			if true, prompt to purchase or return to shop
+				if purchased, prompt to equip now or sent to storage.
+		if true, check if player has item currently equipped.
+			if false, prompt if player would like to swap currently equipped weapon for this one
+			if true, display weapon currently equipped
+
+OptionSelect
+- New function! The user will be prompted if they want to battle again, visit the item shop or save and exit the game. 
+	- This could act as a user front-end for the main orchestration function. (Runs after PostCombat?)
+
+Other stuff to fix	
+- I should experiment with screen clears and text formatting so the screen isn't covered in commands.  

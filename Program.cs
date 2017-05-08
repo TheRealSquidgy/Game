@@ -1,46 +1,79 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
+using System.Xml.Serialization;
 
-//1.2 - Made combat repeatable.
-//1.3 - Introduced save files.
-//1.4 - Introduced new RPG mechanics. A levelling system, critical hits, end-of round shop.
-namespace Gamev1._4
+/*
+v1.5 - Code refactor! Change save files to XML filetype, create orchestrator-style switch to allow dynamic function ordering, 
+v1.4 - Introduce new RPG mechanics. A levelling system, critical hits. End-of-round shop function created but not implemented.
+v1.3 - Introduced save files - binary filetype.
+v1.2 - Made combat repeatable
+*/
+
+namespace Gamev1._5
 {
     class Program
     {
         static void Main(string[] args)
         {
             Soldier player = new Soldier();
-            if (File.Exists(Save.SaveFile))
+            Inventory playerInventory = new Inventory();
+            if (File.Exists(State.SaveLocation))
             {
-                player = LoadFromFile(player);
+                player = State.Load(player);
             }
-            Start(player);
-            bool playTheGame = true;
-            Entity Victor;
-            while (playTheGame)
+
+            string NextFunction = "Start";
+            while (NextFunction != "Exit")
             {
-                Sectoid enemy = new Sectoid();
-                PreCombat(player, enemy);
-                Victor = Combat(player, enemy);
-                PostCombat(Victor, player);
-                playTheGame = PlayAgain();
+                switch(NextFunction)
+                {
+                    case "Start":
+                        {
+                            NextFunction = Start(player);
+                            break;
+                        }
+                    case "PreCombat":
+                        {
+                            PreCombat(player);
+                            break;
+                        }
+                    //case "Combat":
+                    //    {
+                    //        Combat();
+                    //        break;
+                    //    }
+                    //case "PostCombat":
+                    //    {
+                    //        PostCombat();
+                    //        break;
+                    //    }
+                    //case "GoShopping":
+                    //    {
+                    //        GoShopping();
+                    //        break;
+                    //    }
+                    default:
+                        {
+                            Console.Write("This should never run. Something has gone wrong.");
+                            Console.ReadLine();
+                            Exit(player);
+                            break;
+                        }
+                }
             }
-            System.Environment.Exit(1);
+            Exit(player);
         }
 
-        static void Start(Soldier player)
+        static string Start(Soldier player)
         {
             Console.WriteLine("Welcome to Squidgy's Intergalactice Arena of Death! \n");
             Console.WriteLine("Press 1 to create a new soldier");
             Console.WriteLine("Press 2 to continue a soldier's career");
-            if (File.Exists(Save.SaveFile))
+            if (File.Exists(State.SaveLocation))
             {
                 Console.WriteLine("\t Name: " + player.Name);
                 Console.WriteLine("\t Level: " + player.Level);
@@ -55,56 +88,63 @@ namespace Gamev1._4
             while (Choice == "")
             {
                 Choice = Console.ReadLine();
-                if (Choice == "1")
+                switch(Choice)
                 {
-                    if (File.Exists(Save.SaveFile))
-                    {
-                        Console.WriteLine("Creating a new soldier will end the current soldier's career!");
-                        Console.WriteLine("Are you sure you wish to do this? Y/N");
-                        string overwrite_save = Console.ReadLine();
-                        if (overwrite_save == "y" || overwrite_save == "Y")
+                    case "1":
                         {
-                            File.Delete(Save.SaveFile);
-                            CreateSoldier(player);
-                            SaveToFile(player);
-                            Console.WriteLine(player.Name + " saved to file. \n");
+                            if (File.Exists(State.SaveLocation))
+                            {
+                                Console.WriteLine("Creating a new soldier will end the current soldier's career!");
+                                Console.WriteLine("Are you sure you wish to do this? Y/N");
+                                string overwrite_save = Console.ReadLine();
+                                if (overwrite_save.ToUpper() == "Y")
+                                {
+                                    File.Delete(State.SaveLocation);
+                                    CreateSoldier(player);
+                                    State.Save(player);
+                                    Console.WriteLine(player.Name + " saved to file. \n");
+                                }
+                                else
+                                {
+                                    Console.WriteLine("Creation cancelled.");
+                                    Console.WriteLine("Press 1 to create a new soldier");
+                                    Console.WriteLine("Press 2 to continue a soldier's career");
+                                    Choice = "";
+                                }
+                            }
+                            else
+                            {
+                                CreateSoldier(player);
+                            }
+                            break;
                         }
-                        else
+                    case "2":
                         {
-                            Console.WriteLine("Creation cancelled.");
-                            Console.WriteLine("Press 1 to create a new soldier");
-                            Console.WriteLine("Press 2 to continue a soldier's career");
+                            if (File.Exists(State.SaveLocation))
+                            {
+                                return "PreCombat";
+                                //break;
+                            }
+                            else
+                            {
+                                Console.WriteLine("No save data! Please select 1 to create a new soldier.");
+                                Choice = "";
+                                break;
+                            }
+
+                        }
+                    default:
+                        {
+                            Console.WriteLine("Invalid input. Please enter 1 or 2.");
                             Choice = "";
+                            break;
                         }
-                    }
-                    else
-                    {
-                        CreateSoldier(player);
-                    }
-
-                }
-                else if (Choice == "2")
-                {
-                    if (File.Exists(Save.SaveFile))
-                    {
-                        player = LoadFromFile(player);
-                    }
-                    else
-                    {
-                        Choice = "";
-                        Console.WriteLine("No save data! Please select 1.");
-                    }
-
-                }
-                else
-                {
-                    Choice = "";
-                    Console.WriteLine("Invalid input. Please enter 1 or 2.");
                 }
             }
+            return "PreCombat";
         }
 
-        static void CreateSoldier(Soldier player)
+        static string CreateSoldier(Soldier player)
         {
             //Currently handles naming of new soldiers
             //Will be more useful when we introduce classes and abilities
@@ -119,6 +159,7 @@ namespace Gamev1._4
                 {
                     player.Name = soldier_name;
                     Console.WriteLine("Your soldier is now called " + player.Name + "!");
+                    return "PreCombat";
                 }
                 else
                 {
@@ -126,186 +167,47 @@ namespace Gamev1._4
                     Console.WriteLine("Name cancelled. Please re-enter your soldier's name.");
                 }
             }
+            return "PreCombat";
         }
 
-        static void SaveToFile(Soldier player)
+        static void PreCombat(Soldier player)
         {
-            FileStream stream = new FileStream(Save.SaveFile, FileMode.Create);
-            BinaryFormatter bformatter = new BinaryFormatter();
-            bformatter.Serialize(stream, player);
-            stream.Close();
+            Console.WriteLine("This is the precombat phase! Your soldier's name is " + player.Name);
+            Console.ReadLine();
+            System.Environment.Exit(1);
         }
 
-        static Soldier LoadFromFile(Soldier player)
+        static void Exit(Soldier player)
         {
-            FileStream stream = new FileStream(Save.SaveFile, FileMode.Open);
-            BinaryFormatter bformatter = new BinaryFormatter();
-            Soldier RetrievedSaveState = (Soldier)bformatter.Deserialize(stream);
-            stream.Close();
+            //Saves and exits the game. The save process at this stage is cautionary and optional as the last function to write to the save file should have saved on exit anyway.
+            State.Save(player);
+            System.Environment.Exit(0);
+        }
+    }
+
+    static class State
+    {
+        //The following variable requires System.IO to make Path.Combine work
+        public static string SaveLocation = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "save.xml");
+
+        public static void Save(Soldier player)
+        {
+            XmlSerializer serializer = new XmlSerializer(typeof(Soldier));
+            using (TextWriter writer = new StreamWriter(SaveLocation))
+            {
+                serializer.Serialize(writer, player);
+            }
+        }
+
+        public static Soldier Load(Soldier player)
+        {
+            //Instantiates Xmlserialiser with the object type to deserialize
+            XmlSerializer deserializer = new XmlSerializer(typeof(Soldier));
+            //Reads the file using FileStream
+            FileStream myFileStream = new FileStream(SaveLocation, FileMode.Open);
+            //Calls the Deserialize method and casts it to object type
+            Soldier RetrievedSaveState = (Soldier)deserializer.Deserialize(myFileStream);
             return RetrievedSaveState;
-
-        }
-
-        static void PreCombat(Soldier player, Entity enemy)
-        {
-            Console.WriteLine("You are " + player.Name + ", a " + player.Class + " with " + player.HPCurrent + "HP, armed with a " + player.WeaponEquipped.Name + " that does " + player.WeaponEquipped.DmgMin + "-" + player.WeaponEquipped.DmgMax + " damage.");
-            Console.WriteLine("Your opponent is a " + enemy.Class + " with " + enemy.HPCurrent + "HP, armed with a " + enemy.WeaponEquipped.Name + " that does " + enemy.WeaponEquipped.DmgMin + "-" + enemy.WeaponEquipped.DmgMax + " damage. \n");
-            Console.WriteLine("Let battle commence! \n");
-        }
-
-        static Entity Combat(Entity player, Entity enemy)
-        {
-            while (player.HPCurrent > 0 || enemy.HPCurrent > 0)
-            {
-                Console.WriteLine("Press 1 to Attack. \n");
-                string command = Console.ReadLine();
-                if (command == "1")
-                {
-                    Attack(player, enemy);
-                    if (enemy.HPCurrent <= 0)
-                    {
-                        return player;
-                    }
-                    Attack(enemy, player);
-                    if (player.HPCurrent <= 0)
-                    {
-                        return enemy;
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("Invalid input. Please press 1.");
-                }
-            }
-
-            return player; //this return value should never trigger
-
-        }
-
-        static void Attack(Entity attacker, Entity defender)
-        {
-            Random random = new Random();
-            int roll_to_hit = random.Next(1, 101);
-            if (roll_to_hit < attacker.Aim)
-            {
-                int roll_for_crit = random.Next(1, 101);
-                if (roll_for_crit < attacker.WeaponEquipped.CritChance)
-                {
-                    int critDamage = random.Next(attacker.WeaponEquipped.CritDmgMin, (attacker.WeaponEquipped.CritDmgMax + 1));
-                    defender.HPCurrent -= critDamage;
-                    if (defender.HPCurrent > 0)
-                    {
-                        Console.WriteLine(attacker.Name + " lands a devastating critical hit on the " + defender.Name + ", doing " + critDamage + " damage!");
-                        Console.WriteLine(attacker.Class + " - " + attacker.HPCurrent + "HP remaining. \t" + defender.Class + " - " + defender.HPCurrent + "HP remaining. \n");
-                    }
-                    else
-                    {
-                        Console.WriteLine("BLAM! " + attacker.Name + " blasts a big messy hole straight through the " + defender.Class + ", killing them super dead!");
-                    }
-                }
-                else
-                {
-                    int damage = random.Next(attacker.WeaponEquipped.DmgMin, (attacker.WeaponEquipped.DmgMax + 1));
-                    defender.HPCurrent -= damage;
-                    if (defender.HPCurrent > 0)
-                    {
-                        Console.WriteLine(attacker.Name + " fires their " + attacker.WeaponEquipped.Name + " at the " + defender.Class + ", doing " + damage.ToString() + " damage!");
-                        Console.WriteLine(attacker.Class + " - " + attacker.HPCurrent + "HP remaining. \t" + defender.Class + " - " + defender.HPCurrent + "HP remaining. \n");
-                    }
-                    else
-                    {
-                        Console.WriteLine(attacker.Name + " fires their " + attacker.WeaponEquipped.Name + " at the " + defender.Class + ", doing " + damage.ToString() + " damage, killing them! \n");
-                    }
-                }
-            }
-            else
-            {
-                Console.WriteLine(attacker.Name + " fires their " + attacker.WeaponEquipped.Name + " at the " + defender.Class + "...and misses!");
-                Console.WriteLine(attacker.Class + " - " + attacker.HPCurrent + "HP remaining. \t" + defender.Class + " - " + defender.HPCurrent + "HP remaining. \n");
-            }
-        }
-
-        static void PostCombat(Entity Victor, Soldier player)
-        {
-            if (Victor == player)
-            {
-                Console.WriteLine("Congratulations, you win!");
-                int experience_earned = GenerateExp();
-                Console.WriteLine(player.Name + " earned " + experience_earned + " experience points!");
-                player.Experience += experience_earned;
-                while (player.Experience >= player.ExpReqToLevel)
-                {
-                    int ExperienceCarriedOver = player.Experience - player.ExpReqToLevel;
-                    player.Experience = ExperienceCarriedOver;
-                    player.Level++;
-                    Console.WriteLine("You are now level " + player.Level + "!");
-                    player.ExpReqToLevel = CalculateNewLevelExpReq(player);
-                }
-                int prize_money = GeneratePrizeMoney();
-                player.Moonbux += prize_money;
-                Console.WriteLine(player.Name + " wins " + prize_money + " Moonbux as prize money! \n");
-                int nextLevel = player.Level + 1;
-                Console.WriteLine("Progress to level " + nextLevel + ": " + player.Experience + "/" + player.ExpReqToLevel + " \t Moonbux: " + player.Moonbux);
-                player.HPCurrent = player.HPMax;
-                player.Survived += 1;
-                SaveToFile(player);
-                Console.WriteLine(player.Name + "'s progress has been saved.");
-            }
-            else
-            {
-                Console.WriteLine(player.Name + " is dead! Game over.");
-                Console.WriteLine("!!!---SAVE DELETED---!!!");
-                File.Delete(Save.SaveFile);
-                Console.ReadLine();
-                System.Environment.Exit(1);
-
-            }
-
-        }
-
-        static int GeneratePrizeMoney()
-        {
-            Random randomPayout = new Random();
-            int prize_money = randomPayout.Next(100, 201);
-            return prize_money;
-        }
-
-        static int GenerateExp()
-        {
-            Random ExperienceGain = new Random();
-            int Experience = ExperienceGain.Next(80, 121);
-            return Experience;
-        }
-
-        static int CalculateNewLevelExpReq(Soldier player)
-        {
-            int LevelExpReq = 100 + (player.Level * 50);
-            return LevelExpReq;
-        }
-
-        static bool PlayAgain()
-        {
-            string choice = "";
-            while (choice == "")
-            {
-                Console.WriteLine("Would you like to play again? Y/N");
-                choice = Console.ReadLine();
-                if (choice == "Y" || choice == "y")
-                {
-                    return true;
-                }
-                else if (choice == "N" || choice == "n")
-                {
-                    return false;
-                }
-                else
-                {
-                    choice = "";
-                    Console.WriteLine("Invalid input. Please answer with Y/N \n");
-                }
-            }
-
-            return false;
         }
     }
 
@@ -339,6 +241,17 @@ namespace Gamev1._4
         public int Moonbux = 0;
         public int Survived = 0;
 
+    }
+
+    [Serializable]
+    class Inventory
+    {
+        public Inventory()
+        {
+            Weapons = new List<Weapon>();
+        }
+
+        public List<Weapon> Weapons;
     }
 
     class Sectoid : Entity
@@ -377,7 +290,7 @@ namespace Gamev1._4
             DmgMax = 40;
             CritDmgMin = 50;
             CritDmgMax = 70;
-            Description = "Standard issue for all soldiers.";
+            Description = "Standard issue firearm for all soldiers.";
         }
     }
 
@@ -392,7 +305,7 @@ namespace Gamev1._4
             DmgMax = 40;
             CritDmgMin = 50;
             CritDmgMax = 70;
-            Description = "An alien weapon. Small but powerful.";
+            Description = "An alien weapon. Small but powerful for a pistol.";
         }
     }
 
@@ -407,7 +320,7 @@ namespace Gamev1._4
             DmgMax = 50;
             CritDmgMin = 60;
             CritDmgMax = 80;
-            Description = "Close range weapon with high crit damage.";
+            Description = "Close range assault weapon with high crit damage.";
         }
     }
 
@@ -422,7 +335,7 @@ namespace Gamev1._4
             DmgMax = 50;
             CritDmgMin = 60;
             CritDmgMax = 80;
-            Description = "Long range weapon with  good crit chance.";
+            Description = "Long range bolt-action weapon with good crit chance.";
         }
     }
 
@@ -471,27 +384,9 @@ namespace Gamev1._4
         }
     }
 
-    [Serializable]
-    class PlayerInventory
+    class ShopItem
     {
-        public List<Weapon> Weapons; 
+        public Weapon WeaponData;
+        public int ItemPrice;
     }
-
-    class ShopInventory
-    {
-        public ShopInventory()
-        {
-
-        }
-
-        public List<Weapon> Weapons;
-
-
-    }
-
-    static class Save
-    {
-        public static string SaveFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "save.bin");
-    }
-    
 }

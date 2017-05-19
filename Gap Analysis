@@ -16,7 +16,7 @@ Main
 	- playTheGame = PlayAgain()
 - System.Environment.Exit(1)
 
-Start // This function is mostly okay. No changes needed
+Start // This function is mostly okay. Not much changes needed
 - "Welcome!"
 - "Press 1 to start new soldier career"
 - "Press 2 to resume existing career"
@@ -112,6 +112,12 @@ New game logic
 
 Main
 //New game logic: Each 'main' function will return the name of the next function to run
+//An outside Entity object is used to pass the victorious object from combat to postcombat
+
+Instantiate Soldier player
+Instantiate Inventory playerInventory
+Instantiate Sectoid Enemy
+if Savefile exists, load savefile of player and playerInventory
 Var nextFunction = 'Start';
 while nextFunction != 'exit'
 	switch(nextFunction)
@@ -121,6 +127,8 @@ while nextFunction != 'exit'
 			PreCombat();
 			Combat();
 			PostCombat();
+		case 'OptionSelect':
+			OptionSelect();
 		case 'Shop' : 
 			GoShopping();
 		default:
@@ -130,22 +138,19 @@ while nextFunction != 'exit'
 Exit();
 
 Start
-//Mostly good, shouldn't need changing. As long as the player's save is loaded and/or the player object is instantiated before the function ends (which it does), it will work. 
-- Change relational expression from if else to switch statement
+//Mostly good, shouldn't need muchchanging. As long as the player's save is loaded and/or the player object is instantiated before the function ends (which it does), it will work. 
+- Change relational expression from if else to switch statements
 - return "PreCombat" at end of function. 
 - Move the save file load from main() into start function
 
 PreCombat, Combat and PostCombat
-//Probably deserve to be packaged in their own static class (Mission?).
+//Repackaged into their own static class (Mission).
 - PreCombat returns Combat, Combat returns PostCombat
-- PostCombat should be rewritten to prompt the user what to do next. They can return Exit, GoShopping or PreCombat depending on the case statement chosen (PostCombat returns OptionSelect?)
+- PostCombat Postcombat returns OptionSelect
 - Simplify the attack function by abstracting roll to hit and roll to crit into their own separate functions.
-- What step is sectoid object created? Can I instantiate sectoid in PreCombat and still use it in Combat?
 
 SaveToFile, LoadFromFile
-- package into static class 
-	- File? Check if 'File' is a reserved keyword
-	- What about SaveState? SaveState.Load, SaveState.Save.
+- package into static class State.
 
 
 GoShopping
@@ -175,4 +180,5 @@ OptionSelect
 	- This could act as a user front-end for the main orchestration function. (Runs after PostCombat?)
 
 Other stuff to fix	
-- I should experiment with screen clears and text formatting so the screen isn't covered in commands.  
+- I should experiment with screen clears and text formatting so the screen isn't covered in commands.
+- Add more comments so future me can easily understand the logic. This includes the ordering of certain commands!

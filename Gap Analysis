@@ -161,7 +161,7 @@ GoShopping
 		- A ShopItem coud be anything with a price. It might not always be a weapon. It could be armour, or a consumable, or another item. It will always only ever have one classification (e.g. weapon is not a consumable). Is this a good time to use overloading? Research class overloading
 	- The ShopInventory is a list of ShopItems!
 	- Currently the ShopInventory's ShopItems are all Weapons, but this will change in the future
-- Creating the ShopInventory and stocking it with ShopItems should only happen once. (StockShelves?)
+- Creating the ShopInventory and stocking it with ShopItems should only happen once. (Use static constructor!)
 - The user is then prompted to select an from the ShopInventory, or to LEAVE the store. (BrowseSelection)
 	- If user selects leave then they are taken to the OptionSelect function
 	- if user enters an integer with a valid number that equals an index value in ShopInventory then that item is selected

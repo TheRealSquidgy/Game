@@ -112,12 +112,6 @@ New game logic
 
 Main
 //New game logic: Each 'main' function will return the name of the next function to run
-//An outside Entity object is used to pass the victorious object from combat to postcombat
-
-Instantiate Soldier player
-Instantiate Inventory playerInventory
-Instantiate Sectoid Enemy
-if Savefile exists, load savefile of player and playerInventory
 Var nextFunction = 'Start';
 while nextFunction != 'exit'
 	switch(nextFunction)
@@ -125,12 +119,13 @@ while nextFunction != 'exit'
 			Start();
 		case 'Mission' : 
 			PreCombat();
-			Combat();
-			PostCombat();
-		case 'OptionSelect':
-			OptionSelect();
+			Winner = Combat();
+			PostCombat(Winner);
+			nextFunction = "OptionSelect"
 		case 'Shop' : 
 			GoShopping();
+		case 'OptionSelect':
+			OptionSelect();
 		default:
 			"This should never run. Something has gone wrong."
 			Console.ReadLine();
@@ -138,30 +133,112 @@ while nextFunction != 'exit'
 Exit();
 
 Start
-//Mostly good, shouldn't need muchchanging. As long as the player's save is loaded and/or the player object is instantiated before the function ends (which it does), it will work. 
-- Change relational expression from if else to switch statements
+//Mostly good, shouldn't need changing. As long as the player's save is loaded and/or the player object is instantiated before the function ends (which it does), it will work. 
+- Make this second!
+- Change relational expression from if else to switch statement
 - return "PreCombat" at end of function. 
 - Move the save file load from main() into start function
 
 PreCombat, Combat and PostCombat
-//Repackaged into their own static class (Mission).
-- PreCombat returns Combat, Combat returns PostCombat
-- PostCombat Postcombat returns OptionSelect
+//Make this after Start
+- Packaged into static class, only one instance of combat can be played by a player at a time anyway.
+- PreCombat returns Combat, The winning object from Combat is passed to PostCombat.
+- PostCombat should be rewritten to prompt the user what to do next. They can return Exit, GoShopping or PreCombat depending on the case statement chosen
 - Simplify the attack function by abstracting roll to hit and roll to crit into their own separate functions.
 
+
+
+- Remember to test the experience management function for correct handling of huge amounts of exp, leading to the player character levelling up multiple times in one match
+
+UPDATE: NEW COMBAT AND ATTACK FUNCTION
+- PreCombat runs first.
+- Combat function is called after PreCombat function ends
+- Combat function returns the surviving object, to be used by PostCombat
+- PostCombat checks the survivor. 
+	If it's the player, they get exp, moonbux, a full heal and their game is saved
+	else it's the enemy, the player's soldier is dead! Savefile is deleted. GAME OVER.
+- OptionSelect runs after PostCombat
+	If the player lives, prompt if they want to play again, visit the item shop or save and quit
+	else the player is dead! GAME OVER. Prompt if they want to create a new character or quit.
+
+Combat(player, enemy)
+	Entity Victor = null;
+	while Victor = null
+		"<player.name> the <player.class> - X HP"
+		"Enemy <enemy class> - X HP \n"
+
+		"Press 1 to attack"
+
+		switch
+			1
+				bool AttackCrits = false; //The bool allows us to differentiate a regular death from a critical hit death inside the death check function, allowing unique death messages.
+				AttackCrits = Attack(player, enemy)
+				Victor = CheckIfDead(enemy, player, AttackCrits)
+				AttackCrits = Attack(enemy, player)
+				Victor = CheckIfDead(player, enemy, AttackCrits)
+			default
+				"Invalid input"
+
+Attack(attacker, defender)
+	bool AttackLands = RollToHit(attacker)
+	bool AttackCrits = RollToCrit(attacker)
+	if AttackLands
+		Damage = CalculateDamage(attacker, AttackCrits)
+		Defender.HP -= Damage
+		if AttackCrits
+			"<attacker.name> lands a devastating critical hit on the <defender.class>, doing <Damage> damage!"
+		else
+			<attacker.name> fires their <attacker.weaponequipped> at the <defender.class>, doing <Damage> damage!"
+	else
+		"<attacker.name> fires at the <defender.class>.....and misses!"
+
+RollToHit(attacker)
+	generate random number between 1 and 100 (inclusive)
+	if random number < attacker.aim
+		return true
+	else
+		return false
+
+RollToCrit(attacker)
+	generate random number between 1 and 100 (inclusive)
+	if random number < attacker.weaponequipped.critchance
+		return true
+	else
+		return false
+		
+CalculateDamage(attacker)
+	if AttackCrits
+		Damage = roll for crit damage
+	else
+		Damage = roll for damage
+	return Damage
+
+CheckIfDead(victim, victor, AttackCrits)
+	if victim.HP <= 0
+		if AttackCrits
+			"Boom headshot! With a well-placed round the <victim.class>'s brains are splattered all over the arena!"
+		else
+			"The <victim.class> dies in a withering hail of gunfire!"
+		return Victor
+	else
+		return null
+
 SaveToFile, LoadFromFile
-- package into static class State.
+- Make this first!
+- package into static class 
+	- File? Check if 'File' is a reserved keyword
+	- What about SaveState? SaveState.Load, SaveState.Save. UPDATE: State. 
 
 
 GoShopping
-//Should be turned into a static class and its 'parts' broken up into their own functions.
-- Package into static class named Shop. 
+//Should be turned into a class and its 'parts' broken up into their own functions.
+- Package into class named Shop. 
 - Verify that my definition between weapons and items is clear enough for future expansion.
 	- A ShopItem is an item with a price
-		- A ShopItem coud be anything with a price. It might not always be a weapon. It could be armour, or a consumable, or another item. It will always only ever have one classification (e.g. weapon is not a consumable). Is this a good time to use overloading? Research class overloading
+		- A ShopItem coud be anything with a price. It might not always be a weapon. It could be armour, or a consumable, or another item. It will always only ever have one classification (e.g. weapon is not a consumable). Possible opportunity to use overloading?
 	- The ShopInventory is a list of ShopItems!
 	- Currently the ShopInventory's ShopItems are all Weapons, but this will change in the future
-- Creating the ShopInventory and stocking it with ShopItems should only happen once. (Use static constructor!)
+- Creating the ShopInventory and stocking it with ShopItems should only happen once. (Via constructor)
 - The user is then prompted to select an from the ShopInventory, or to LEAVE the store. (BrowseSelection)
 	- If user selects leave then they are taken to the OptionSelect function
 	- if user enters an integer with a valid number that equals an index value in ShopInventory then that item is selected
@@ -175,10 +252,58 @@ GoShopping
 			if false, prompt if player would like to swap currently equipped weapon for this one
 			if true, display weapon currently equipped
 
+Refactored Shop function
+
+Constructor
+	- creates shop inventory, a list made of ShopItems
+
+bool playerExitsShop = false
+while (playerExitsShop == false)	
+	public string BrowseItemShop()
+		if string == "exit"
+			playerExitsShop = true
+		else
+			validate player input
+			if string = valid input
+				ExamineItem()
+				bool playerOwnsWeapon = CheckWeaponOwnership()
+				if playerOwnsWeapon
+					EquipOption()
+				else
+					PurchaseOption()
+			else
+				"Invalid input"
+
+"Thanks for visiting. See you next time!"
+nextFunction = "OptionSelect"			
+
+
+BrowseItemShop
+	- Displays all shop items
+	- Prompts user to either select an item from the menu or EXIT
+		- If player EXITs, they are sent to the option select function
+		- returns a valid menu selection
+	
+ExamineItem
+	- Displays items stats and attributes based on menu selection returned from BrowseItemShop()
+	- Check for weapon ownership (CheckWeaponOwnership)
+		- If player doesn't own weapon, run PurchaseDecision()
+		- If player does own weapon, check if it's currently equipped (CheckIfEquipped)
+			- If it is, display stats, prompt to return to item list.
+			- If it's not, offer to equip it now or return to item list.
+				- Player sends equipped weapon to player inventory, currently viewed item is equipped, currently viewed item is removed from player inventory
+				- return to item list.
+
+PurchaseDecision
+	- Check if player can afford the item (CheckFunds)
+	- If player can afford it and does purchase the item, prompt if they want to equip it now or add it to player inventory
+		- Currently equipped weapon sent to inventory, selected weapon is equipped, returns to item list.
+		- Player sends weapon to inventory, returns to item list.
+	- If player cannot afford it, "Insufficient funds!", return to item list.		
+	
 OptionSelect
 - New function! The user will be prompted if they want to battle again, visit the item shop or save and exit the game. 
 	- This could act as a user front-end for the main orchestration function. (Runs after PostCombat?)
 
 Other stuff to fix	
 - I should experiment with screen clears and text formatting so the screen isn't covered in commands.
-- Add more comments so future me can easily understand the logic. This includes the ordering of certain commands!

@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 using System.Xml.Serialization;
+using System.Threading;
 
 /*
 v1.5 - Code refactor! Change save files to XML filetype, create orchestrator-style switch to allow dynamic function ordering, 
@@ -22,6 +23,7 @@ namespace Gamev1._5
             Soldier player = new Soldier();
             Sectoid enemy = new Sectoid();
             Inventory playerInventory = new Inventory();
+            Shop ItemShop = new Shop();            
             if (File.Exists(State.SaveLocation))
             {
                 player = State.Load(player);
@@ -30,7 +32,7 @@ namespace Gamev1._5
             string nextFunction = "Start";
             while (nextFunction != "Exit")
             {
-                switch(nextFunction)
+                switch (nextFunction)
                 {
                     case "Start":
                         {
@@ -42,7 +44,7 @@ namespace Gamev1._5
                             Entity winner;
                             Mission.PreCombat(player, enemy);
                             winner = Mission.Combat(player, enemy);
-                            Mission.PostCombat(winner);
+                            Mission.PostCombat(winner, player);
                             nextFunction = "OptionSelect";
                             break;
                         }
@@ -53,7 +55,27 @@ namespace Gamev1._5
                         }
                     case "Shop":
                         {
-                            nextFunction = GoShopping();
+                            bool playerExitsShop = false;
+                            while (playerExitsShop == false)
+                            {
+                                int itemSelected;
+                                itemSelected = ItemShop.BrowseItemShop(player);
+                                switch(itemSelected)
+                                {
+                                    case 9999:
+                                        {
+                                            playerExitsShop = true;
+                                            break;
+                                        }
+                                    default:
+                                        {
+                                            ItemShop.ExamineItem(itemSelected, player, playerInventory);                                           
+                                            break;
+                                        }
+                                }
+                            }
+                            Console.WriteLine("Thanks for visiting the store. See you later!");
+                            nextFunction = "OptionSelect";                          
                             break;
                         }
                     default:
@@ -92,7 +114,7 @@ namespace Gamev1._5
             while (Choice == "")
             {
                 Choice = Console.ReadLine();
-                switch(Choice)
+                switch (Choice)
                 {
                     case "1":
                         {
@@ -138,7 +160,11 @@ namespace Gamev1._5
 
                         }
                     case "3":
-                        System.Environment.Exit(0);
+                        {
+                            System.Environment.Exit(0);
+                            break;
+                        }
+                        
                     default:
                         {
                             Console.WriteLine("Invalid input. Please enter 1 or 2.");
@@ -179,14 +205,6 @@ namespace Gamev1._5
             return "PreCombat";
         }
 
-        //Exit function removed for now. The redundant save call gets in the way more than it helps.
-        //static void Exit(Soldier player)
-        //{
-        //    //Saves and exits the game. The save process at this stage is cautionary and optional as the last function to write to the save file should have saved on exit anyway.
-        //    State.Save(player);
-        //    System.Environment.Exit(0);
-        //}
-
         //Win or lose, OptionSelect handles what happens after PostCombat. If the player won (savefile still exists), they can play again, visit the item shop or save and quit. If the player lost, they can return to title screen or quit.
         public static string OptionSelect()
         {
@@ -205,23 +223,23 @@ namespace Gamev1._5
                         case "1":
                             {
                                 return "Mission";
-                                break;
+                                //break;
                             }
                         case "2":
                             {
                                 return "Shop";
-                                break;
+                                //break;
                             }
                         case "3":
                             {
                                 return "Exit";
-                                break;
+                                //break;
                             }
                         default:
                             {
                                 Console.WriteLine("Invalid input. Please enter 1, 2 or 3 from the above options.");
                                 Choice = "";
-
+                                break;
                             }
 
                     }
@@ -235,26 +253,30 @@ namespace Gamev1._5
                     Console.WriteLine("What would you like to do next?\n");
                     Console.WriteLine("1. Start a new game");
                     Console.WriteLine("2. Quit");
+                    Choice = Console.ReadLine();
                     switch (Choice)
                     {
                         case "1":
                             {
                                 return "Start";
-                                break;
+                                //break;
                             }
                         case "2":
                             {
                                 return "Exit";
-                                break;
+                                //break;
                             }
                         default:
                             {
                                 Console.WriteLine("Invalid input. Please enter 1 or 2.");
                                 Choice = "";
+                                break;
                             }
                     }
                 }
             }
+            Console.WriteLine("Something has gon wrong in OptionSelect. You should never see this.");
+            return "Exit";
         }
     }
 
@@ -268,6 +290,7 @@ namespace Gamev1._5
             Console.WriteLine("Your opponent is a {0} with {1}HP, armed with a {2} that does {3}-{4} damage. \n", enemy.Class, enemy.HPMax, enemy.WeaponEquipped.Name, enemy.WeaponEquipped.DmgMin, enemy.WeaponEquipped.DmgMax);
             Console.WriteLine("Let battle commence! \n");
             Console.ReadLine();
+            Console.Clear();
         }
 
         //Combat continues until there is only one survivor, detected and returned by CheckForSurvivors function. The survivor will be announced in PostCombat.
@@ -280,23 +303,27 @@ namespace Gamev1._5
                 Console.WriteLine("Enemy {0} - {1}/{2}HP\n", enemy.Name, enemy.HPCurrent, enemy.HPMax);
                 Console.WriteLine("Press 1 to Attack");
                 string Choice = "";
-                while (Choice = "")
+                while (Choice == "")
                 {
                     Choice = Console.ReadLine();
-                    switch(Choice)
+                    switch (Choice)
                     {
                         case "1":
                             bool criticalHit;
                             criticalHit = Attack(player, enemy);
                             survivor = CheckForSurvivors(enemy, player, criticalHit);
+                            if (!(survivor == null))
+                            {
+                                break;
+                            }
                             criticalHit = Attack(enemy, player);
                             survivor = CheckForSurvivors(player, enemy, criticalHit);
                             break;
                         default:
                             //This screenclear might need adjustment.
                             Console.WriteLine("Invalid input. Press 1 to Attack.");
-                            Console.ReadLine();
-                            Console.Clear();
+                            //Console.ReadLine();
+                            //Console.Clear();
                             Choice = "";
                             break;
 
@@ -322,7 +349,7 @@ namespace Gamev1._5
                 }
                 else
                 {
-                    Console.WriteLine("{0} fires their {1} at the {2}, doing {3} damage!", Attacker.Name, Attacker.WeaponEquipped.Name, damage);
+                    Console.WriteLine("{0} fires their {1} at the {2}, doing {3} damage!", Attacker.Name, Attacker.WeaponEquipped.Name, Defender.Name, damage);
                     return false;
                 }
             }
@@ -363,10 +390,11 @@ namespace Gamev1._5
 
         public static int CalculateDamage(Entity Attacker, bool AttackCrits)
         {
+            Thread.Sleep(100);
             if (AttackCrits)
             {
                 Random random1 = new Random();
-                int CritDamage = random.Next(Attacker.WeaponEquipped.CritDmgMin, (Attacker.WeaponEquipped.CritDmgMax + 1));
+                int CritDamage = random1.Next(Attacker.WeaponEquipped.CritDmgMin, (Attacker.WeaponEquipped.CritDmgMax + 1));
                 return CritDamage;
             }
             else
@@ -386,7 +414,6 @@ namespace Gamev1._5
                 {
                     Console.WriteLine("BOOM headshot! The {0} splatters the {1}'s brains all over the arena, killing them instantly. The match is over!", Victor.Class, Victim.Class);
                 }
-
                 else
                 {
                     Console.WriteLine("The {0} cuts down the {1} with a withering hail of gunfire. The match is over!", Victor.Class, Victim.Class);
@@ -437,15 +464,15 @@ namespace Gamev1._5
 
         public static int GenerateExperience()
         {
-            Random ExperienceGain = new Random();
-            int Experience = ExperienceGain(80, 121);
+            Random experienceGain = new Random();
+            int Experience = experienceGain.Next(80, 121);
             return Experience;
         }
 
         public static int GeneratePrizeMoney()
         {
             Random randomPayout = new Random();
-            int prizeMoney = randomPayout(100, 201);
+            int prizeMoney = randomPayout.Next(100, 201);
             return prizeMoney;
         }
 
@@ -457,11 +484,122 @@ namespace Gamev1._5
 
     }
 
-    static class Shop
+    class Shop
     {
-        public static Shop()
+        List<ShopItem> ShopInventory = new List<ShopItem>();
+        /*
+        //Displays a list of weapons. The function will return either a valid ShopInventory index value, or it will return 9999, an exit code.
+        public int BrowseItemShop(Soldier player)
         {
-            List<ShopItem> ShopInventory = new List<ShopItem>(); //Populates ShopInventory at runtime. Is there another way to handle this?           
+            string itemChoice = "";
+            while (itemChoice == "")
+            {
+                Console.WriteLine("Welcome to the item shop!\n"); //displays item list, prompts user to select item number
+                for (int i = 0; i < ShopInventory.Count; i++)
+                {
+                    Console.WriteLine((i + 1) + ") " + ShopInventory[i].WeaponData.Name);
+                }
+                Console.WriteLine();
+                Console.WriteLine(player.Name + "'s funds: " + player.Moonbux + " Moonbux");
+                Console.WriteLine("Select a number to view weapon stats. Type EXIT to leave the item shop: -");
+
+                itemChoice = Console.ReadLine();
+                bool isInt;
+                int intItemChoice;
+                isInt = int.TryParse(itemChoice, out intItemChoice);
+
+                while (itemChoice == "")
+                {
+                    if (isInt)
+                    {
+                        intItemChoice -= 1;
+                        if (intItemChoice <= ShopInventory.Count && intItemChoice >= 0)
+                        {
+                            return intItemChoice;
+                        }
+                    }
+                    else if (itemChoice.ToUpper() == "Exit")
+                    {
+                        Console.WriteLine("Thanks for visiting the item shop! See you next time.");
+                        return 9999;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Invalid input. Select a valid menu option to view weapon stats.");
+                        itemChoice = "";
+                        Console.ReadLine();
+                    }
+                }
+
+            }
+            Console.WriteLine("Something has gone wrong in the DisplayItems function. You should never see this.");
+            return 666;
+        }
+
+        public void ExamineItem(int indexValue, Soldier player, Inventory playerInventory)
+        {
+            Weapon selectedWeaponData = ShopInventory[indexValue].WeaponData;
+
+            Console.WriteLine("Weapon: " + selectedWeaponData.Name);
+            Console.WriteLine("Damage: " + selectedWeaponData.DmgMin + "-" + selectedWeaponData.DmgMax);
+            Console.WriteLine("Critical Hit Damage: " + selectedWeaponData.CritDmgMin + "-" + selectedWeaponData.CritDmgMax);
+            Console.WriteLine("Critical Hit Chance: " + selectedWeaponData.CritChance + "%");
+            Console.WriteLine(selectedWeaponData.Description + "\n");
+
+            bool playerOwnsWeapon = CheckWeaponOwnership(player, playerInventory, selectedWeaponData);
+            if (playerOwnsWeapon == false)
+            {
+                bool playerCanAffordItem = CheckFunds(ShopInventory[indexValue], player);
+                if (playerCanAffordItem)
+                {
+
+                }
+                else
+                {
+                    Console.WriteLine("Insufficient funds! Returning to item shop.");
+                }
+
+            }
+            else
+            {
+
+            }
+        }
+
+        static bool CheckFunds(ShopItem item, Soldier player)
+        {
+            if (item.ItemPrice <= player.Moonbux)
+            {
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        }
+
+        //Checks if player has the currently selected weapon equipped, or if they own the weapon in their inventory. If so return true, else return false.
+        static bool CheckWeaponOwnership(Soldier player, Inventory playerInventory, Weapon SelectedWeapon)
+        {
+            if (player.WeaponEquipped.Name == SelectedWeapon.Name)
+            {
+                return true;
+            }
+            else
+            {
+                for (int i = 0; i < playerInventory.Weapons.Count; i++)
+                {
+                    if (playerInventory.Weapons[i].Name == SelectedWeapon.Name)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        */
+        public Shop()
+        {        
             ShopInventory.Add(new ShopItem { WeaponData = new AssaultRifle(), ItemPrice = 0 });
             ShopInventory.Add(new ShopItem { WeaponData = new Shotgun(), ItemPrice = 500 });
             ShopInventory.Add(new ShopItem { WeaponData = new SniperRifle(), ItemPrice = 500 });
@@ -470,6 +608,236 @@ namespace Gamev1._5
             ShopInventory.Add(new ShopItem { WeaponData = new Minigun(), ItemPrice = 1000 });
         }
 
+        //displays ShopInventory, prompts user to enter item number OR exit the store. Will keep looping until player makes a valid selection.
+        public int BrowseItemShop(Soldier player)
+        {
+            bool isInt = false;
+            bool validInt = false;
+            while (isInt == false && validInt == false)
+            {
+                Console.WriteLine("Welcome to the item shop!\n");
+                for (int i = 0; i < ShopInventory.Count; i++)
+                {
+                    Console.WriteLine((i + 1) + ") " + ShopInventory[i].WeaponData.Name);
+                }
+                Console.WriteLine();
+                Console.WriteLine(player.Name + "'s funds: " + player.Moonbux + " Moonbux");
+                Console.WriteLine("Select a number to view weapon stats. Type EXIT to leave the item shop: -");
+
+                string itemChoice = Console.ReadLine();
+                //First checks if player chooses to exit. Otherwise, it will check if player input is a valid ShopInventory index value.
+                if (itemChoice.ToUpper() == "EXIT")
+                {
+                    return 9999;
+                }
+                else
+                {
+                    int intItemChoice;
+                    isInt = int.TryParse(itemChoice, out intItemChoice);
+                    if (isInt)
+                    {
+                        intItemChoice -= 1;
+                        if (intItemChoice <= ShopInventory.Count && intItemChoice >= 0)
+                        {
+                            validInt = true;
+                            return intItemChoice;
+                        }
+                        else
+                        {
+                            Console.WriteLine("Invalid input. Please enter a valid item number.");
+                            Console.ReadLine();
+                            Console.Clear();
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("Invalid input. Please enter a valid item number.");
+                        Console.ReadLine();
+                        Console.Clear();
+                    }
+                }
+            }
+            Console.WriteLine("This should never trigger. Something has gone wrong.");
+            return 666;
+        }
+
+        public void ExamineItem(int itemSelected, Soldier player, Inventory playerInventory)
+        {
+            Weapon selectedWeaponData = ShopInventory[itemSelected].WeaponData;
+
+            Console.WriteLine("Weapon: " + selectedWeaponData.Name);
+            Console.WriteLine("Damage: " + selectedWeaponData.DmgMin + "-" + selectedWeaponData.DmgMax);
+            Console.WriteLine("Critical Hit Damage: " + selectedWeaponData.CritDmgMin + "-" + selectedWeaponData.CritDmgMax);
+            Console.WriteLine("Critical Hit Chance: " + selectedWeaponData.CritChance + "%");
+            Console.WriteLine(selectedWeaponData.Description + "\n");
+
+            bool playerOwnsWeapon = CheckWeaponOwnership(selectedWeaponData, player, playerInventory);
+            if (playerOwnsWeapon)
+            {
+                PurchaseOption(ShopInventory[itemSelected], player, playerInventory);
+            }
+            else
+            {
+                EquipOption(selectedWeaponData, player, playerInventory);
+            }
+        }
+
+        public void EquipOption(Weapon selectedWeaponData, Soldier player, Inventory playerInventory)
+        {
+            bool SelectedWeaponAlreadyEquipped = CheckIfEquipped(selectedWeaponData, player);
+            if (SelectedWeaponAlreadyEquipped)
+            {
+                Console.WriteLine("{0} already equipped. PRess any key to return to item list.");
+                Console.ReadLine();
+            }
+            else
+            {
+                Console.WriteLine("{0} already purchased and in storage.", selectedWeaponData.Name);
+                Console.WriteLine("You currently have the {0} equipped.", player.WeaponEquipped.Name);
+                Console.WriteLine("Press 1 to swap weapons. Press 2 to returen to item list.");
+                string equipOrReturn = "";
+                while (equipOrReturn == "")
+                {
+                    switch(equipOrReturn)
+                    {
+                        case "1":
+                            {
+                                playerInventory.Weapons.Add(player.WeaponEquipped);
+                                player.WeaponEquipped = selectedWeaponData;
+                                Console.WriteLine("{0} taken from inventory and equipped.", player.WeaponEquipped.Name);
+                                break;
+
+                            }
+                        case "2":
+                            break;
+                        default:
+                            {
+                                Console.WriteLine("Invalid input. Press 1 to equip this weapon now. Press 2 to return to item list.");
+                                break;
+                            }
+                    }
+                }
+            }
+        }
+
+        public static void RemoveWeaponFromInventory(Soldier player, Inventory playerInventory)
+        {
+            for (int i = 0; i < playerInventory.Weapons.Count; i++)
+            {
+                if (playerInventory.Weapons[i].Name == player.WeaponEquipped.Name)
+                {
+                    playerInventory.Weapons.RemoveAt(i);
+                }
+            }
+        }
+
+        public bool CheckIfEquipped(Weapon selectedWeaponData, Soldier player)
+        {
+            if (selectedWeaponData.Name == player.WeaponEquipped.Name)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        public void PurchaseOption(ShopItem selectedWeapon, Soldier player, Inventory playerInventory)
+        {
+            bool playerCanAffordItem = CheckFunds(selectedWeapon, player);
+            if (playerCanAffordItem)
+            {
+                Console.WriteLine("Press 1 to buy weapon. Press 2 to return to item list.");
+                string purchaseDecision = "";
+                while (purchaseDecision == "")
+                {
+                    switch(purchaseDecision)
+                    {
+                        case "1":
+                            {
+                                player.Moonbux -= selectedWeapon.ItemPrice;
+                                Console.WriteLine("{0} purchased! Press 1 to equip now. Press 2 to sent to inventory.", selectedWeapon.WeaponData.Name);
+                                string purchaseItemDestination = "";
+                                while (purchaseItemDestination == "")
+                                {
+                                    purchaseItemDestination = Console.ReadLine();
+                                    switch(purchaseItemDestination)
+                                    {
+                                        case "1":
+                                            {
+                                                Console.WriteLine("{0} equipped. {1} sent to inventory", selectedWeapon.WeaponData.Name, player.WeaponEquipped.Name);
+                                                playerInventory.Weapons.Add(player.WeaponEquipped);
+                                                player.WeaponEquipped = selectedWeapon.WeaponData;
+                                                break;
+                                            }
+                                        case "2":
+                                            {
+                                                playerInventory.Weapons.Add(selectedWeapon.WeaponData);
+                                                Console.WriteLine("{0} sent to inventory. Press any key to continue", selectedWeapon.WeaponData.Name);
+                                                Console.ReadLine();
+                                                break;
+                                            }
+                                        default:
+                                            {
+                                                Console.WriteLine("Invalid input. Press 1 to equip {0} now. Press 2 to sent to inventory.", selectedWeapon.WeaponData.Name);
+                                                break;
+                                            }
+                                    }
+                                }
+
+                                break;
+                            }
+                        case "2":
+                            {
+                                break;
+                            }
+                        default:
+                            {
+                                Console.WriteLine("Invalid input. Press 1 to buy weapon. Press 2 to return to item list.");
+                                purchaseDecision = "";
+                                break;
+                            }
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine("Insufficient funds! Press any key to return to item list.");
+                Console.ReadLine();
+            }
+        }
+
+        public bool CheckFunds(ShopItem selectedWeapon, Soldier player)
+        {
+            if (selectedWeapon.ItemPrice <= player.Moonbux)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        public bool CheckWeaponOwnership(Weapon selectedWeaponData, Soldier player, Inventory playerInventory)
+        {
+            if (selectedWeaponData.Name == player.WeaponEquipped.Name)
+            {
+                return true;
+            }
+            else
+            {
+                for (int i = 0; i < playerInventory.Weapons.Count; i++)
+                {
+                    if (selectedWeaponData.Name == playerInventory.Weapons[i].Name)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
 
     }
 
@@ -502,18 +870,18 @@ namespace Gamev1._5
     }
 
     [Serializable]
-    class Entity
+    public class Entity
     {
-        public string Name;
-        public string Class;
-        public int HPCurrent;
-        public int HPMax;
-        public int Aim;
+        public string Name { get; set; }
+        public string Class { get; set; }
+        public int HPCurrent { get; set; }
+        public int HPMax { get; set; }
+        public int Aim { get; set; }
         public Weapon WeaponEquipped;
     }
 
     [Serializable]
-    class Soldier : Entity
+    public class Soldier : Entity
     {
         public Soldier()
         {
@@ -535,7 +903,7 @@ namespace Gamev1._5
 
     //player inventory. Currently only stores weapons. This needs to be expanded as items come online.
     [Serializable]
-    class Inventory
+    public class Inventory
     {
         public Inventory()
         {
@@ -545,7 +913,7 @@ namespace Gamev1._5
         public List<Weapon> Weapons;
     }
 
-    class Sectoid : Entity
+    public class Sectoid : Entity
     {
         public Sectoid()
         {
@@ -559,19 +927,19 @@ namespace Gamev1._5
     }
 
     [Serializable]
-    class Weapon
+    public class Weapon
     {
-        public string Name;
-        public int CritChance;
-        public int DmgMin;
-        public int DmgMax;
-        public int CritDmgMin;
-        public int CritDmgMax;
-        public string Description;
+        public string Name { get; set; }
+        public int CritChance { get; set; }
+        public int DmgMin { get; set; }
+        public int DmgMax { get; set; }
+        public int CritDmgMin { get; set; }
+        public int CritDmgMax { get; set; }
+        public string Description { get; set; }
     }
 
     [Serializable]
-    class AssaultRifle : Weapon
+    public class AssaultRifle : Weapon
     {
         public AssaultRifle()
         {
@@ -586,7 +954,7 @@ namespace Gamev1._5
     }
 
     [Serializable]
-    class PlasmaPistol : Weapon
+    public class PlasmaPistol : Weapon
     {
         public PlasmaPistol()
         {
@@ -601,7 +969,7 @@ namespace Gamev1._5
     }
 
     [Serializable]
-    class Shotgun : Weapon
+    public class Shotgun : Weapon
     {
         public Shotgun()
         {
@@ -616,7 +984,7 @@ namespace Gamev1._5
     }
 
     [Serializable]
-    class SniperRifle : Weapon
+    public class SniperRifle : Weapon
     {
         public SniperRifle()
         {
@@ -631,7 +999,7 @@ namespace Gamev1._5
     }
 
     [Serializable]
-    class LMG : Weapon
+    public class LMG : Weapon
     {
         public LMG()
         {
@@ -646,7 +1014,7 @@ namespace Gamev1._5
     }
 
     [Serializable]
-    class RocketLauncher : Weapon
+    public class RocketLauncher : Weapon
     {
         public RocketLauncher()
         {
@@ -661,7 +1029,7 @@ namespace Gamev1._5
     }
 
     [Serializable]
-    class Minigun : Weapon
+    public class Minigun : Weapon
     {
         public Minigun()
         {
@@ -675,9 +1043,10 @@ namespace Gamev1._5
         }
     }
 
-    class ShopItem
+    public class ShopItem
     {
         public Weapon WeaponData;
         public int ItemPrice;
     }
 }
+

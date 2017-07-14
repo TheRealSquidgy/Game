@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.IO;
 using System.Xml.Serialization;
 using System.Threading;
+using System.Runtime.Serialization;
+
 
 /*
 v1.5 - Code refactor! Change save files to XML filetype, create orchestrator-style switch to allow dynamic function ordering, 
@@ -20,8 +19,7 @@ namespace Gamev1._5
     {
         static void Main(string[] args)
         {
-            Soldier player = new Soldier();
-            Sectoid enemy = new Sectoid();
+            Soldier player = new Soldier();           
             Inventory playerInventory = new Inventory();
             Shop ItemShop = new Shop();            
             if (File.Exists(State.SaveLocation))
@@ -42,6 +40,7 @@ namespace Gamev1._5
                     case "Mission":
                         {
                             Entity winner;
+                            Sectoid enemy = new Sectoid();
                             Mission.PreCombat(player, enemy);
                             winner = Mission.Combat(player, enemy);
                             Mission.PostCombat(winner, player);
@@ -850,37 +849,42 @@ namespace Gamev1._5
         //The Save and Load functions requires System.Xml.Serialization library to work
         public static void Save(Soldier player)
         {
-            XmlSerializer serializer = new XmlSerializer(typeof(Soldier));
-            using (TextWriter writer = new StreamWriter(SaveLocation))
+            using (Stream stream = new FileStream(SaveLocation, FileMode.Create))
             {
-                serializer.Serialize(writer, player);
+                DataContractSerializer serializer = new DataContractSerializer(typeof(Soldier));
+                serializer.WriteObject(stream, player);
             }
         }
 
         public static Soldier Load(Soldier player)
         {
-            //Instantiates Xmlserialiser with the object type to deserialize
-            XmlSerializer deserializer = new XmlSerializer(typeof(Soldier));
-            //Reads the file using FileStream
-            FileStream myFileStream = new FileStream(SaveLocation, FileMode.Open);
-            //Calls the Deserialize method and casts it to object type
-            Soldier RetrievedSaveState = (Soldier)deserializer.Deserialize(myFileStream);
-            return RetrievedSaveState;
+            DataContractSerializer Deserializer = new DataContractSerializer(typeof(Soldier));
+            using (Stream stream = File.OpenRead(State.SaveLocation))
+            {
+                Soldier retrievedState = (Soldier)Deserializer.ReadObject(stream);
+                return retrievedState;
+            }
         }
     }
-
-    [Serializable]
+    [DataContract]
+    [KnownType(typeof(AssaultRifle))]
+    [KnownType(typeof(PlasmaPistol))]
+    [KnownType(typeof(Shotgun))]
+    [KnownType(typeof(SniperRifle))]
+    [KnownType(typeof(LMG))]
+    [KnownType(typeof(RocketLauncher))]
+    [KnownType(typeof(Minigun))]
     public class Entity
     {
-        public string Name { get; set; }
-        public string Class { get; set; }
-        public int HPCurrent { get; set; }
-        public int HPMax { get; set; }
-        public int Aim { get; set; }
-        public Weapon WeaponEquipped;
+        [DataMember] public string Name;
+        [DataMember] public string Class;
+        [DataMember] public int HPCurrent;
+        [DataMember] public int HPMax;
+        [DataMember] public int Aim;
+        [DataMember] public Weapon WeaponEquipped;
     }
 
-    [Serializable]
+    [DataContract]
     public class Soldier : Entity
     {
         public Soldier()
@@ -893,24 +897,11 @@ namespace Gamev1._5
             WeaponEquipped = new AssaultRifle();
         }
 
-        public int Level = 1;
-        public int Experience = 0;
-        public int ExpReqToLevel = 100;
-        public int Moonbux = 0;
-        public int Survived = 0;
-
-    }
-
-    //player inventory. Currently only stores weapons. This needs to be expanded as items come online.
-    [Serializable]
-    public class Inventory
-    {
-        public Inventory()
-        {
-            Weapons = new List<Weapon>();
-        }
-
-        public List<Weapon> Weapons;
+        [DataMember] public int Level = 1;
+        [DataMember] public int Experience = 0;
+        [DataMember] public int ExpReqToLevel = 100;
+        [DataMember] public int Moonbux = 0;
+        [DataMember] public int Survived = 0;
     }
 
     public class Sectoid : Entity
@@ -921,24 +912,42 @@ namespace Gamev1._5
             Class = "Sectoid";
             HPCurrent = 70;
             HPMax = 70;
-            Aim = 60;
+            Aim = 80;
             WeaponEquipped = new PlasmaPistol();
         }
     }
 
-    [Serializable]
-    public class Weapon
+    //player inventory. Currently only stores weapons. This needs to be expanded as items come online.
+    [DataContract]
+    [KnownType(typeof(AssaultRifle))]
+    [KnownType(typeof(PlasmaPistol))]
+    [KnownType(typeof(Shotgun))]
+    [KnownType(typeof(SniperRifle))]
+    [KnownType(typeof(LMG))]
+    [KnownType(typeof(RocketLauncher))]
+    [KnownType(typeof(Minigun))]
+    public class Inventory
     {
-        public string Name { get; set; }
-        public int CritChance { get; set; }
-        public int DmgMin { get; set; }
-        public int DmgMax { get; set; }
-        public int CritDmgMin { get; set; }
-        public int CritDmgMax { get; set; }
-        public string Description { get; set; }
+        public Inventory()
+        {
+            Weapons = new List<Weapon>();
+        }
+        [DataMember] public List<Weapon> Weapons;
     }
 
-    [Serializable]
+    [DataContract]
+    public class Weapon
+    {
+        [DataMember] public string Name;
+        [DataMember] public int CritChance;
+        [DataMember] public int DmgMin;
+        [DataMember] public int DmgMax;
+        [DataMember] public int CritDmgMin;
+        [DataMember] public int CritDmgMax;
+        [DataMember] public string Description;
+    }
+
+    [DataContract]
     public class AssaultRifle : Weapon
     {
         public AssaultRifle()
@@ -953,7 +962,7 @@ namespace Gamev1._5
         }
     }
 
-    [Serializable]
+    [DataContract]
     public class PlasmaPistol : Weapon
     {
         public PlasmaPistol()
@@ -968,7 +977,7 @@ namespace Gamev1._5
         }
     }
 
-    [Serializable]
+    [DataContract]
     public class Shotgun : Weapon
     {
         public Shotgun()
@@ -983,7 +992,7 @@ namespace Gamev1._5
         }
     }
 
-    [Serializable]
+    [DataContract]
     public class SniperRifle : Weapon
     {
         public SniperRifle()
@@ -998,7 +1007,7 @@ namespace Gamev1._5
         }
     }
 
-    [Serializable]
+    [DataContract]
     public class LMG : Weapon
     {
         public LMG()
@@ -1013,7 +1022,7 @@ namespace Gamev1._5
         }
     }
 
-    [Serializable]
+    [DataContract]
     public class RocketLauncher : Weapon
     {
         public RocketLauncher()
@@ -1028,7 +1037,7 @@ namespace Gamev1._5
         }
     }
 
-    [Serializable]
+    [DataContract]
     public class Minigun : Weapon
     {
         public Minigun()
